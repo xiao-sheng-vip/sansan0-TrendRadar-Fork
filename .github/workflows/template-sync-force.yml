@@ -1,0 +1,127 @@
+name: 强制同步模板（完全覆盖，仅保留指定文件）
+
+on:
+  schedule:
+    - cron: "0 0 1 * *"  # 每月1号
+  workflow_dispatch:
+
+jobs:
+  force-sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: 检出代码（完整历史）
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      - name: 备份保留的配置文件
+        run: |
+          mkdir -p /tmp/preserve-backup
+          
+          # 备份三个指定文件（如果不存在则忽略）
+          if [ -f ".github/workflows/crawler.yml" ]; then
+            cp .github/workflows/crawler.yml /tmp/preserve-backup/
+            echo "✓ 已备份 crawler.yml"
+          fi
+          
+          if [ -f "config/config.yaml" ]; then
+            cp config/config.yaml /tmp/preserve-backup/
+            echo "✓ 已备份 config.yaml"
+          fi
+          
+          if [ -f "config/frequency_words.txt" ]; then
+            cp config/frequency_words.txt /tmp/preserve-backup/
+            echo "✓ 已备份 frequency_words.txt"
+          fi
+          
+          ls -la /tmp/preserve-backup/
+      
+      - name: 添加模板远程仓库并获取最新代码
+        run: |
+          git remote add template https://github.com/sansan0/TrendRadar.git
+          git fetch template main
+      
+      - name: 强制同步（删除本地文件，应用模板，恢复保留文件）
+        run: |
+          # 创建新分支
+          git checkout -b chore/force-template-sync
+          
+          # 删除工作目录中的所有文件（保留.git）
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          
+          # 从模板分支检出所有文件到工作目录
+          git checkout template/main -- .
+          
+          # 确保目录存在
+          mkdir -p .github/workflows config
+          
+          # 恢复备份的文件（覆盖模板中的版本）
+          if [ -f "/tmp/preserve-backup/crawler.yml" ]; then
+            cp /tmp/preserve-backup/crawler.yml .github/workflows/
+            git add .github/workflows/crawler.yml
+            echo "✓ 已恢复 crawler.yml（保留本地版本）"
+          fi
+          
+          if [ -f "/tmp/preserve-backup/config.yaml" ]; then
+            cp /tmp/preserve-backup/config.yaml config/
+            git add config/config.yaml
+            echo "✓ 已恢复 config.yaml（保留本地版本）"
+          fi
+          
+          if [ -f "/tmp/preserve-backup/frequency_words.txt" ]; then
+            cp /tmp/preserve-backup/frequency_words.txt config/
+            git add config/frequency_words.txt
+            echo "✓ 已恢复 frequency_words.txt（保留本地版本）"
+          fi
+      
+      - name: 提交更改
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add -A
+          git commit -m "chore: 强制同步模板更新
+          
+          完全覆盖本地文件，仅保留以下本地配置：
+          - .github/workflows/crawler.yml
+          - config/config.yaml  
+          - config/frequency_words.txt"
+      
+      - name: 强制推送到远程
+        run: |
+          # 如果远程已存在该分支，先删除
+          git push origin --delete chore/force-template-sync 2>/dev/null || true
+          git push origin chore/force-template-sync
+      
+      - name: 创建 Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          分支: chore/force-template-sync
+          title: "chore: 强制同步模板更新（完全覆盖模式）"
+          body: |
+            ⚠️ **此 PR 为强制同步，会覆盖所有本地文件**
+            
+            ### 同步策略
+            1. 删除全部本地文件
+            2. 从模板仓库拉取最新文件
+            3. 恢复本地保留的配置文件
+            
+            ### 保留的本地文件（未被覆盖）
+            | 文件 | 状态 |
+            |------|------|
+            | `.github/workflows/crawler.yml` | ✅ 保留本地版本 |
+            | `config/config.yaml` | ✅ 保留本地版本 |
+            | `config/frequency_words.txt` | ✅ 保留本地版本 |
+            
+            ### 其他文件
+            全部从模板仓库强制更新。
+          labels: |
+            template-sync
+            force-sync
+          draft: false

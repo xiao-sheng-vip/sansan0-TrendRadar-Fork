@@ -1,0 +1,10 @@
+# 不同步 GitHub Actions 工作流
+.github/workflows/crawler.yml
+
+# 不同步配置文件
+config/config.yaml
+config/frequency_words.txt
+
+# 你也可以添加其他模式
+# *.env
+# README.md

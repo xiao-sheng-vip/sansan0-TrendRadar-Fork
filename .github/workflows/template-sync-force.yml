@@ -11,13 +11,13 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      workflows: write  # ← 关键：允许修改工作流文件
+    # 注意：删除了错误的 workflows: write
     
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SYNC_TOKEN }}  # ← 改为 PAT
           fetch-depth: 0
       
       - name: 备份保留的配置文件
@@ -57,9 +57,9 @@ jobs:
       - name: 创建 Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SYNC_TOKEN }}  # ← 也要改为 PAT
           branch: chore/force-template-sync
-          title: "chore: 强制同步模板更新"
+          title: "chore: 强制同步模板更新（完全覆盖）"
           body: |
             从 `sansan0/TrendRadar@master` 强制同步
             

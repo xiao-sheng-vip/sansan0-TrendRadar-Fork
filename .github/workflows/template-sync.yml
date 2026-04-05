@@ -1,10 +1,8 @@
 name: 同步模板更新
 
 on:
-  # 每周一早上8点自动检查（北京时间）
   schedule:
-    - cron: "0 0 * * 1"
-  # 允许手动触发
+    - cron: "0 0 * * 1"  # 每周一
   workflow_dispatch:
 
 jobs:
@@ -18,24 +16,16 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # 关键：必须添加这行，否则可能报 128 错误
+          persist-credentials: false
           fetch-depth: 0
-      
+
       - name: 同步模板
         uses: AndreasAugustin/actions-template-sync@v2
         with:
-          source_repo_path: <sansan0>/<TrendRadar>  # ⚠️ 修改这里！
+          source_repo_path: <sansan0>/<TrendRadar>  # 修改这里！
           upstream_branch: main
           pr_labels: template_sync
           pr_title: "chore: 同步上游模板更新"
-          pr_body: |
-            自动同步上游模板仓库的更新。
-            
-            **被忽略的文件（保留本地修改）:**
-            - `.github/workflows/crawler.yml`
-            - `config/config.yaml`
-            - `config/frequency_words.txt`
-      
-      - name: 输出结果
-        run: |
-          echo "同步完成，请检查创建的 Pull Request"
+          # 明确使用 GITHUB_TOKEN（公开仓库足够）
+          source_gh_token: ${{ secrets.GITHUB_TOKEN }}

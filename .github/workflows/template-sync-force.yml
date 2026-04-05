@@ -1,6 +1,6 @@
 name: 强制同步模板（完全覆盖，仅保留指定文件）
 
-于:
+on:
   schedule:
     - cron: "0 0 1 * *"
   workflow_dispatch:

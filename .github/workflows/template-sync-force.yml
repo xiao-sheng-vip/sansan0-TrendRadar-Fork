@@ -11,6 +11,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      workflows: write  # ← 关键：允许修改工作流文件
     
     steps:
       - name: 检出代码
@@ -25,25 +26,17 @@ jobs:
           [ -f ".github/workflows/crawler.yml" ] && cp .github/workflows/crawler.yml /tmp/preserve-backup/ && echo "✓ 已备份 crawler.yml"
           [ -f "config/config.yaml" ] && cp config/config.yaml /tmp/preserve-backup/ && echo "✓ 已备份 config.yaml"
           [ -f "config/frequency_words.txt" ] && cp config/frequency_words.txt /tmp/preserve-backup/ && echo "✓ 已备份 frequency_words.txt"
-          ls -la /tmp/preserve-backup/
       
-      - name: 添加模板远程仓库并获取代码
+      - name: 添加模板远程仓库
         run: |
           git remote add template https://github.com/sansan0/TrendRadar.git
-          # ⚠️ 关键修改：master 不是 main
           git fetch template master
       
       - name: 强制同步
         run: |
           git checkout -b chore/force-template-sync
-          
-          # 删除所有本地文件（保留.git）
           find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
-          
-          # 从模板检出所有文件
           git checkout template/master -- .
-          
-          # 恢复保留的文件
           mkdir -p .github/workflows config
           [ -f "/tmp/preserve-backup/crawler.yml" ] && cp /tmp/preserve-backup/crawler.yml .github/workflows/ && git add .github/workflows/crawler.yml
           [ -f "/tmp/preserve-backup/config.yaml" ] && cp /tmp/preserve-backup/config.yaml config/ && git add config/config.yaml
@@ -54,13 +47,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "chore: 强制同步模板更新（保留本地配置）
-          
-          从 sansan0/TrendRadar@master 强制同步
-          保留本地文件：
-          - .github/workflows/crawler.yml
-          - config/config.yaml
-          - config/frequency_words.txt"
+          git commit -m "chore: 强制同步模板更新（保留本地配置）"
       
       - name: 强制推送
         run: |
@@ -72,12 +59,12 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: chore/force-template-sync
-          title: "chore: 强制同步模板更新（完全覆盖模式）"
+          title: "chore: 强制同步模板更新"
           body: |
-            ⚠️ **此 PR 会覆盖所有本地文件，仅保留以下配置文件：**
+            从 `sansan0/TrendRadar@master` 强制同步
+            
+            **保留的本地文件：**
             - `.github/workflows/crawler.yml`
             - `config/config.yaml`
             - `config/frequency_words.txt`
-            
-            同步来源：`sansan0/TrendRadar@master`
-          labels: template-sync, force-sync
+          labels: template-sync

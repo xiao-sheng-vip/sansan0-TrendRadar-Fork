@@ -11,14 +11,15 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    # 注意：删除了错误的 workflows: write
     
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.SYNC_TOKEN }}  # ← 改为 PAT
+          token: ${{ secrets.SYNC_TOKEN }}
           fetch-depth: 0
+          # 明确检出默认分支作为基础
+          ref: master
       
       - name: 备份保留的配置文件
         run: |
@@ -27,44 +28,55 @@ jobs:
           [ -f "config/config.yaml" ] && cp config/config.yaml /tmp/preserve-backup/ && echo "✓ 已备份 config.yaml"
           [ -f "config/frequency_words.txt" ] && cp config/frequency_words.txt /tmp/preserve-backup/ && echo "✓ 已备份 frequency_words.txt"
       
-      - name: 添加模板远程仓库
+      - name: 添加模板远程仓库并强制同步
         run: |
           git remote add template https://github.com/sansan0/TrendRadar.git
           git fetch template master
-      
-      - name: 强制同步
-        run: |
-          git checkout -b chore/force-template-sync
-          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
-          git checkout template/master -- .
+          
+          # 创建临时分支进行同步（不切换过去）
+          git checkout -b temp-template-sync template/master
+          
+          # 确保目录存在并恢复保留的文件
           mkdir -p .github/workflows config
-          [ -f "/tmp/preserve-backup/crawler.yml" ] && cp /tmp/preserve-backup/crawler.yml .github/workflows/ && git add .github/workflows/crawler.yml
-          [ -f "/tmp/preserve-backup/config.yaml" ] && cp /tmp/preserve-backup/config.yaml config/ && git add config/config.yaml
-          [ -f "/tmp/preserve-backup/frequency_words.txt" ] && cp /tmp/preserve-backup/frequency_words.txt config/ && git add config/frequency_words.txt
-      
-      - name: 提交更改
-        run: |
+          [ -f "/tmp/preserve-backup/crawler.yml" ] && cp /tmp/preserve-backup/crawler.yml .github/workflows/
+          [ -f "/tmp/preserve-backup/config.yaml" ] && cp /tmp/preserve-backup/config.yaml config/
+          [ -f "/tmp/preserve-backup/frequency_words.txt" ] && cp /tmp/preserve-backup/frequency_words.txt config/
+          
+          # 提交更改
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "chore: 强制同步模板更新（保留本地配置）"
-      
-      - name: 强制推送
-        run: |
-          git push origin --delete chore/force-template-sync 2>/dev/null || true
-          git push origin chore/force-template-sync
+          git commit -m "chore: 强制同步模板更新（保留本地配置）
+          
+          从 sansan0/TrendRadar@master 强制同步
+          保留本地文件：
+          - .github/workflows/crawler.yml
+          - config/config.yaml
+          - config/frequency_words.txt"
+          
+          # 将临时分支合并回 master（保留我们的更改）
+          git checkout master
+          git merge temp-template-sync --strategy-option theirs
       
       - name: 创建 Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ secrets.SYNC_TOKEN }}  # ← 也要改为 PAT
-          branch: chore/force-template-sync
-          title: "chore: 强制同步模板更新（完全覆盖）"
+          token: ${{ secrets.SYNC_TOKEN }}
+          branch: chore/template-sync-force    # 新分支名（与 base 不同）
+          base: master                          # 目标分支
+          title: "chore: 强制同步模板更新（完全覆盖模式）"
           body: |
+            ⚠️ **此 PR 会覆盖所有本地文件**
+            
             从 `sansan0/TrendRadar@master` 强制同步
             
             **保留的本地文件：**
-            - `.github/workflows/crawler.yml`
-            - `config/config.yaml`
-            - `config/frequency_words.txt`
-          labels: template-sync
+            | 文件 | 说明 |
+            |------|------|
+            | `.github/workflows/crawler.yml` | ✅ 保留本地版本 |
+            | `config/config.yaml` | ✅ 保留本地版本 |
+            | `config/frequency_words.txt` | ✅ 保留本地版本 |
+            
+            **其他文件**：全部从模板仓库更新
+          labels: template-sync, force-sync
+          delete-branch: true  # PR 合并后删除分支

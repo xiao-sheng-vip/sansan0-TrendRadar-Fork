@@ -16,7 +16,6 @@ services:
     environment:
       - TZ=Asia/Shanghai
       # Web 服务器
-      - ENABLE_WEBSERVER=${ENABLE_WEBSERVER:-false}
       - WEBSERVER_PORT=${WEBSERVER_PORT:-8080}
       # 通知渠道
       - FEISHU_WEBHOOK_URL=${FEISHU_WEBHOOK_URL:-}
@@ -43,7 +42,7 @@ services:
       - GENERIC_WEBHOOK_URL=${GENERIC_WEBHOOK_URL:-}
       - GENERIC_WEBHOOK_TEMPLATE=${GENERIC_WEBHOOK_TEMPLATE:-}
       # AI 配置（ai_analysis 和 ai_translation 共享模型配置）
-      - AI_ANALYSIS_ENABLED=${AI_ANALYSIS_ENABLED:-false}
+      - AI_ANALYSIS_ENABLED=${AI_ANALYSIS_ENABLED:-}
       - AI_API_KEY=${AI_API_KEY:-}
       - AI_MODEL=${AI_MODEL:-}
       - AI_API_BASE=${AI_API_BASE:-}
@@ -66,7 +65,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "127.0.0.1:3333:3333"
+      - "${MCP_HOST:-127.0.0.1}:${MCP_PORT:-3333}:3333"
 
     volumes:
       - ../config:/app/config:ro
@@ -74,3 +73,4 @@ services:
 
     environment:
       - TZ=Asia/Shanghai
+      - MCP_PORT=${MCP_PORT:-3333}
